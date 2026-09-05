@@ -1,1 +1,628 @@
- 
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>영토 전쟁 게임 - 돌격</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.47.0/dist/tabler-icons.min.css">
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Malgun Gothic", sans-serif;
+    background: #F4F3F1;
+    color: #2B2A28;
+    display: flex;
+    justify-content: center;
+    padding: 24px 12px;
+  }
+  #app-wrapper {
+    position: relative;
+    width: 100%;
+    max-width: 380px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  h1 { font-size: 18px; font-weight: 600; margin: 0 0 4px; text-align: center; }
+  .stats-row { display: flex; justify-content: space-between; width: 100%; max-width: 340px; gap: 5px; }
+  .stat-box { flex: 1; background: #FFFFFF; border-radius: 10px; padding: 0.4rem 0.3rem; text-align: center; box-shadow: 0 1px 2px rgba(0,0,0,0.06); }
+  .stat-box p:first-child { font-size: 9px; color: #7A776F; margin: 0 0 2px; }
+  .stat-box p:last-child { font-size: 14px; font-weight: 600; margin: 0; }
+  .stat-player { background: #E4F0EA; } .stat-player p { color: #276749 !important; }
+  .stat-enemy { background: #F5E4E4; } .stat-enemy p { color: #9B2C2C !important; }
+  .stat-gold { background: #FFF4D6; } .stat-gold p { color: #946200 !important; }
+
+  #map { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; width: 100%; max-width: 340px; }
+  #map button {
+    aspect-ratio: 1; border-radius: 9px; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 0px; border: 0.5px solid rgba(0,0,0,0.15);
+    padding: 0; cursor: pointer; position: relative;
+  }
+  #map button span { font-size: 14px; font-weight: 700; color: rgba(0,0,0,0.75); }
+  #map button i { font-size: 10px; color: rgba(0,0,0,0.55); }
+
+  .legend { display: flex; gap: 10px; font-size: 9px; color: #7A776F; flex-wrap: wrap; justify-content: center; max-width: 340px; }
+  .legend span { display: flex; align-items: center; gap: 3px; }
+  .swatch { display: inline-block; width: 8px; height: 8px; border-radius: 3px; }
+
+  button { font-family: inherit; border: none; border-radius: 10px; background: #2B2A28; color: #FFFFFF; cursor: pointer; transition: opacity 0.15s; }
+  button:hover { opacity: 0.9; }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  .secondary-btn { background: #FFFFFF; color: #2B2A28; border: 1px solid rgba(0,0,0,0.15); }
+  .full-btn { width: 100%; max-width: 340px; height: 44px; font-size: 15px; font-weight: 600; }
+  .reset-btn { width: 100%; max-width: 340px; height: 36px; font-size: 13px; }
+  .small-btn { flex: 1; height: 38px; font-size: 11px; font-weight: 600; }
+  .action-row { display: flex; gap: 6px; width: 100%; max-width: 340px; }
+
+  #charge-btn { width: 100%; max-width: 340px; height: 40px; font-size: 12px; font-weight: 600; background: #B5541F; color: #fff; }
+
+  #msg { font-size: 13px; color: #5B5850; min-height: 34px; margin: 0; text-align: center; line-height: 1.5; max-width: 310px; }
+
+  #battle-overlay {
+    display: none; position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(20,20,18,0.72); border-radius: 16px; z-index: 50;
+    align-items: center; justify-content: center;
+  }
+  .battle-card { width: 88%; max-width: 300px; background: #FFFFFF; border-radius: 16px; padding: 1.25rem 1rem; display: flex; flex-direction: column; align-items: center; gap: 0.75rem; }
+  .battle-side { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 80px; transition: transform 0.35s ease; }
+  .battle-circle { width: 52px; height: 52px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+</style>
+</head>
+<body>
+<div id="app-wrapper">
+  <h1>⚔️ 영토 전쟁 게임 - 돌격</h1>
+
+  <div class="stats-row">
+    <div class="stat-box"><p>턴</p><p id="turn">1</p></div>
+    <div class="stat-box stat-player"><p>내 영토</p><p id="player-tiles">2</p></div>
+    <div class="stat-box stat-enemy"><p>적 영토</p><p id="enemy-tiles">2</p></div>
+    <div class="stat-box stat-gold"><p>골드</p><p id="gold">3</p></div>
+    <div class="stat-box"><p>행동</p><p id="actions-left">2/2</p></div>
+  </div>
+
+  <div id="map"></div>
+
+  <div class="legend">
+    <span><span class="swatch" style="background:#5DA88A;"></span>내 군대</span>
+    <span><span class="swatch" style="background:#C97575;"></span>적군</span>
+    <span><span class="swatch" style="background:#A6A39C;"></span>중립</span>
+    <span><i class="ti ti-triangle"></i> 산악</span>
+    <span><i class="ti ti-coin"></i> 자원</span>
+    <span><i class="ti ti-shield-check"></i> 요새</span>
+    <span><i class="ti ti-star-filled"></i> 베테랑</span>
+  </div>
+
+  <button id="charge-btn"><i class="ti ti-flame"></i> 돌격 모드: 꺼짐 (전 병력 총공격, 공격력+30%, 점령지 무방비)</button>
+
+  <div class="action-row">
+    <button id="elite-btn" class="small-btn secondary-btn"><i class="ti ti-shield-plus"></i> 정예(5G)</button>
+    <button id="airstrike-btn" class="small-btn secondary-btn"><i class="ti ti-bolt"></i> 공습(8G)</button>
+    <button id="fort-btn" class="small-btn secondary-btn"><i class="ti ti-building-castle"></i> 요새(6G)</button>
+  </div>
+
+  <p id="msg">내 영토(초록)를 눌러 선택한 뒤, 인접한 영토를 눌러 공격하거나 지원군을 보내세요.</p>
+
+  <button id="end-turn-btn" class="full-btn"><i class="ti ti-hourglass-high"></i> 다음 턴</button>
+  <button id="reset-btn" class="reset-btn secondary-btn">새 게임</button>
+
+  <div id="battle-overlay">
+    <div class="battle-card">
+      <p id="battle-title" style="font-size:13px; color:#7A776F; margin:0;">전투 발생!</p>
+      <div style="display:flex; align-items:center; justify-content:center; width:100%; gap:6px;">
+        <div id="atk-side" class="battle-side">
+          <div id="atk-circle" class="battle-circle" style="background:#5DA88A;">
+            <i id="atk-icon" class="ti ti-sword" style="font-size:26px; color:rgba(0,0,0,0.6);"></i>
+          </div>
+          <span id="atk-troops" style="font-size:16px; font-weight:700;">0</span>
+          <span style="font-size:10px; color:#7A776F;">아군</span>
+        </div>
+        <div id="impact-icon" style="font-size:22px; color:#A6A39C; opacity:0; transition:opacity 0.2s;">
+          <i class="ti ti-bolt"></i>
+        </div>
+        <div id="def-side" class="battle-side">
+          <div class="battle-circle" style="background:#C97575;">
+            <i class="ti ti-shield" style="font-size:26px; color:rgba(0,0,0,0.6);"></i>
+          </div>
+          <span id="def-troops" style="font-size:16px; font-weight:700;">0</span>
+          <span style="font-size:10px; color:#7A776F;">적군</span>
+        </div>
+      </div>
+      <p id="battle-result" style="font-size:14px; font-weight:600; min-height:20px; margin:0; text-align:center;"></p>
+      <button id="battle-continue-btn" style="display:none; width:100%; height:38px; font-size:13px; font-weight:500;">계속</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const COLS = 5, ROWS = 4, TOTAL = COLS * ROWS;
+const MAX_TROOPS = 35;
+const ACTIONS_PER_TURN = 2;
+const PLAYER_CAPITAL = 15;
+const ENEMY_CAPITAL = 4;
+const ELITE_COST = 5, ELITE_GAIN = 4;
+const AIRSTRIKE_COST = 8;
+const FORT_COST = 6;
+const VETERAN_WINS_NEEDED = 2;
+const CHARGE_BONUS = 1.3;
+
+let tiles = [];
+let selected = null;
+let abilityMode = null;
+let chargeMode = false;
+let actionsLeft = ACTIONS_PER_TURN;
+let turn = 1;
+let playerGold = 3, enemyGold = 3;
+let gameOver = false;
+
+const mapEl = document.getElementById('map');
+const turnEl = document.getElementById('turn');
+const playerTilesEl = document.getElementById('player-tiles');
+const enemyTilesEl = document.getElementById('enemy-tiles');
+const goldEl = document.getElementById('gold');
+const actionsLeftEl = document.getElementById('actions-left');
+const msgEl = document.getElementById('msg');
+const endTurnBtn = document.getElementById('end-turn-btn');
+const eliteBtn = document.getElementById('elite-btn');
+const airstrikeBtn = document.getElementById('airstrike-btn');
+const fortBtn = document.getElementById('fort-btn');
+const chargeBtn = document.getElementById('charge-btn');
+
+const battleOverlay = document.getElementById('battle-overlay');
+const battleTitle = document.getElementById('battle-title');
+const atkSide = document.getElementById('atk-side');
+const atkCircle = document.getElementById('atk-circle');
+const atkIcon = document.getElementById('atk-icon');
+const defSide = document.getElementById('def-side');
+const atkTroopsEl = document.getElementById('atk-troops');
+const defTroopsEl = document.getElementById('def-troops');
+const impactIcon = document.getElementById('impact-icon');
+const battleResultEl = document.getElementById('battle-result');
+const battleContinueBtn = document.getElementById('battle-continue-btn');
+
+function initTiles() {
+  tiles = [];
+  for (let i = 0; i < TOTAL; i++) {
+    let owner = 'neutral', troops = Math.floor(Math.random() * 5) + 2;
+    let terrain = 'plain';
+    const r = Math.random();
+    if (r < 0.2) terrain = 'mountain';
+    else if (r < 0.4) terrain = 'resource';
+    if (i === PLAYER_CAPITAL) { owner = 'player'; troops = 7; terrain = 'plain'; }
+    if (i === ENEMY_CAPITAL) { owner = 'enemy'; troops = 7; terrain = 'plain'; }
+    tiles.push({ owner: owner, troops: troops, capital: (i === PLAYER_CAPITAL || i === ENEMY_CAPITAL), terrain: terrain, fort: false, veteranWins: 0 });
+  }
+}
+
+function adjacents(idx) {
+  const row = Math.floor(idx / COLS), col = idx % COLS;
+  const result = [];
+  if (row > 0) result.push(idx - COLS);
+  if (row < ROWS - 1) result.push(idx + COLS);
+  if (col > 0) result.push(idx - 1);
+  if (col < COLS - 1) result.push(idx + 1);
+  return result;
+}
+
+function ownerColor(owner) {
+  if (owner === 'player') return '#5DA88A';
+  if (owner === 'enemy') return '#C97575';
+  return '#A6A39C';
+}
+
+function defMultiplier(tile) {
+  let m = 1.0;
+  if (tile.terrain === 'mountain') m *= 1.3;
+  if (tile.fort) m *= 1.3;
+  if (tile.veteranWins >= VETERAN_WINS_NEEDED) m *= 1.15;
+  return m;
+}
+function atkMultiplier(tile) {
+  return tile.veteranWins >= VETERAN_WINS_NEEDED ? 1.15 : 1.0;
+}
+
+function renderMap() {
+  mapEl.innerHTML = '';
+  tiles.forEach((tile, idx) => {
+    const btn = document.createElement('button');
+    const isSelected = selected === idx;
+    let borderStyle = '0.5px solid rgba(0,0,0,0.15)';
+    if (isSelected) borderStyle = chargeMode ? '3px solid #B5541F' : '3px solid #2B2A28';
+    else if (abilityMode === 'elite' && tile.owner === 'player') borderStyle = '3px dashed #2F855A';
+    else if (abilityMode === 'airstrike' && tile.owner === 'enemy') borderStyle = '3px dashed #C53030';
+    else if (abilityMode === 'fort' && tile.owner === 'player') borderStyle = '3px dashed #2B6CB0';
+    btn.style.background = ownerColor(tile.owner);
+    btn.style.border = borderStyle;
+    let topIcon = '';
+    if (tile.capital) topIcon = '<i class="ti ti-crown"></i>';
+    else if (tile.terrain === 'mountain') topIcon = '<i class="ti ti-triangle"></i>';
+    else if (tile.terrain === 'resource') topIcon = '<i class="ti ti-coin"></i>';
+    let badges = '';
+    if (tile.fort) badges += '<i class="ti ti-shield-check" style="font-size:9px;"></i>';
+    if (tile.veteranWins >= VETERAN_WINS_NEEDED) badges += '<i class="ti ti-star-filled" style="font-size:9px;"></i>';
+    btn.innerHTML = topIcon + '<span>' + tile.troops + '</span><span style="display:flex; gap:2px; height:9px;">' + badges + '</span>';
+    btn.addEventListener('click', () => handleTileClick(idx));
+    mapEl.appendChild(btn);
+  });
+}
+
+function updateStats() {
+  turnEl.textContent = turn;
+  playerTilesEl.textContent = tiles.filter(t => t.owner === 'player').length;
+  enemyTilesEl.textContent = tiles.filter(t => t.owner === 'enemy').length;
+  goldEl.textContent = playerGold;
+  actionsLeftEl.textContent = actionsLeft + '/' + ACTIONS_PER_TURN;
+}
+
+function updateChargeBtn() {
+  if (chargeMode) {
+    chargeBtn.style.background = '#8A3D14';
+    chargeBtn.innerHTML = '<i class="ti ti-flame"></i> 돌격 모드: 켜짐 (공격할 영토를 선택하세요)';
+  } else {
+    chargeBtn.style.background = '#B5541F';
+    chargeBtn.innerHTML = '<i class="ti ti-flame"></i> 돌격 모드: 꺼짐 (전 병력 총공격, 공격력+30%, 점령지 무방비)';
+  }
+}
+
+function showMsg(text) { msgEl.textContent = text; }
+
+function battle(attackTile, attackTroops, defTile, bonus) {
+  const atkPower = attackTroops * atkMultiplier(attackTile) * (bonus || 1) * (0.85 + Math.random() * 0.3);
+  const defPower = defTile.troops * defMultiplier(defTile) * (0.85 + Math.random() * 0.3);
+  if (atkPower > defPower) {
+    const survivors = Math.max(1, Math.round(attackTroops * (1 - defPower / atkPower)));
+    return { attackerWins: true, survivors: survivors };
+  } else {
+    const survivors = Math.max(1, Math.round(defTile.troops * (1 - atkPower / defPower)));
+    return { attackerWins: false, survivors: survivors };
+  }
+}
+
+function playBattleScene(sourceIdx, targetIdx, moveTroops, result, isCharge, onDone) {
+  const target = tiles[targetIdx];
+  battleTitle.textContent = isCharge ? '돌격!' : '전투 발생!';
+  atkCircle.style.background = isCharge ? '#B5541F' : '#5DA88A';
+  atkIcon.className = isCharge ? 'ti ti-flame' : 'ti ti-sword';
+  atkTroopsEl.textContent = moveTroops;
+  defTroopsEl.textContent = target.troops;
+  atkSide.style.transform = 'translateX(0)';
+  defSide.style.transform = 'translateX(0)';
+  impactIcon.style.opacity = '0';
+  battleResultEl.textContent = '';
+  battleResultEl.style.color = '#5B5850';
+  battleContinueBtn.style.display = 'none';
+  battleOverlay.style.display = 'flex';
+
+  setTimeout(() => {
+    atkSide.style.transform = isCharge ? 'translateX(24px)' : 'translateX(18px)';
+    defSide.style.transform = isCharge ? 'translateX(-24px)' : 'translateX(-18px)';
+  }, 150);
+
+  setTimeout(() => {
+    impactIcon.style.opacity = '1';
+  }, isCharge ? 400 : 480);
+
+  setTimeout(() => {
+    impactIcon.style.opacity = '0';
+    if (result.attackerWins) {
+      defTroopsEl.textContent = '0';
+      atkTroopsEl.textContent = result.survivors;
+      battleResultEl.style.color = '#2F855A';
+      battleResultEl.textContent = '승리! 영토를 정복했어요' + (isCharge ? ' (돌격 성공)' : '');
+    } else {
+      atkTroopsEl.textContent = '0';
+      defTroopsEl.textContent = result.survivors;
+      battleResultEl.style.color = '#C53030';
+      battleResultEl.textContent = '패배! 공격 부대가 전멸했어요';
+    }
+    battleContinueBtn.style.display = 'block';
+  }, isCharge ? 650 : 750);
+
+  battleContinueBtn.onclick = () => {
+    battleOverlay.style.display = 'none';
+    onDone();
+  };
+}
+
+function handleTileClick(idx) {
+  if (gameOver || battleOverlay.style.display === 'flex') return;
+  const tile = tiles[idx];
+
+  if (abilityMode === 'elite') {
+    if (tile.owner !== 'player') { showMsg('정예 모집은 내 영토에만 사용할 수 있어요.'); return; }
+    playerGold -= ELITE_COST;
+    tile.troops = Math.min(MAX_TROOPS, tile.troops + ELITE_GAIN);
+    actionsLeft -= 1;
+    abilityMode = null;
+    showMsg('정예 부대 ' + ELITE_GAIN + '을(를) 즉시 배치했어요.');
+    renderMap(); updateStats(); checkGameOver();
+    return;
+  }
+  if (abilityMode === 'airstrike') {
+    if (tile.owner !== 'enemy') { showMsg('공습은 적 영토에만 사용할 수 있어요.'); return; }
+    playerGold -= AIRSTRIKE_COST;
+    tile.troops = Math.max(1, Math.floor(tile.troops / 2));
+    actionsLeft -= 1;
+    abilityMode = null;
+    showMsg('공습으로 적 병력을 절반으로 줄였어요.');
+    renderMap(); updateStats(); checkGameOver();
+    return;
+  }
+  if (abilityMode === 'fort') {
+    if (tile.owner !== 'player') { showMsg('요새는 내 영토에만 지을 수 있어요.'); return; }
+    if (tile.fort) { showMsg('이미 요새가 있어요.'); return; }
+    playerGold -= FORT_COST;
+    tile.fort = true;
+    actionsLeft -= 1;
+    abilityMode = null;
+    showMsg('요새를 건설했어요! 방어력이 영구적으로 올라가요.');
+    renderMap(); updateStats(); checkGameOver();
+    return;
+  }
+
+  if (selected === null) {
+    if (tile.owner !== 'player') { showMsg('내 영토(초록)를 먼저 선택하세요.'); return; }
+    const minTroops = chargeMode ? 1 : 2;
+    if (tile.troops < minTroops) { showMsg('병력이 부족해 행동할 수 없어요.'); return; }
+    if (actionsLeft <= 0) { showMsg('이번 턴 행동을 모두 사용했어요. 다음 턴으로 넘어가세요.'); return; }
+    selected = idx;
+    renderMap();
+    showMsg(chargeMode ? '돌격할 인접 영토를 선택하세요. 이 영토는 무방비 상태가 돼요.' : '인접한 영토를 눌러 공격하거나 지원군을 보내세요.');
+    return;
+  }
+
+  if (selected === idx) {
+    selected = null;
+    renderMap();
+    showMsg('선택을 취소했어요.');
+    return;
+  }
+
+  const adj = adjacents(selected);
+  if (!adj.includes(idx)) {
+    showMsg('인접한 영토만 선택할 수 있어요.');
+    return;
+  }
+
+  const sourceIdx = selected;
+  const source = tiles[sourceIdx];
+
+  if (tile.owner === 'player') {
+    if (chargeMode) {
+      showMsg('돌격 모드는 공격에만 사용할 수 있어요. 돌격을 취소했어요.');
+      chargeMode = false;
+      updateChargeBtn();
+    }
+    const moveTroops = source.troops - 1;
+    tile.troops = Math.min(MAX_TROOPS, tile.troops + moveTroops);
+    source.troops = 1;
+    showMsg('지원군 ' + moveTroops + '을(를) 보냈어요.');
+    actionsLeft -= 1;
+    selected = null;
+    renderMap();
+    updateStats();
+    checkGameOver();
+  } else {
+    const isCharge = chargeMode;
+    const moveTroops = isCharge ? source.troops : source.troops - 1;
+    const bonus = isCharge ? CHARGE_BONUS : 1;
+    const result = battle(source, moveTroops, tile, bonus);
+    selected = null;
+    chargeMode = false;
+    updateChargeBtn();
+    renderMap();
+    playBattleScene(sourceIdx, idx, moveTroops, result, isCharge, () => {
+      const target = tiles[idx];
+      const src = tiles[sourceIdx];
+      if (result.attackerWins) {
+        target.owner = 'player';
+        target.troops = result.survivors;
+        target.fort = false;
+        target.veteranWins = Math.min(VETERAN_WINS_NEEDED, src.veteranWins + 1);
+        src.veteranWins = Math.min(VETERAN_WINS_NEEDED, src.veteranWins + 1);
+        src.troops = isCharge ? 0 : 1;
+        showMsg('영토를 정복했어요! 병력 ' + result.survivors + '이(가) 주둔했어요.' + (src.veteranWins >= VETERAN_WINS_NEEDED ? ' 부대가 베테랑이 됐어요!' : '') + (isCharge ? ' 돌격했던 영토는 무방비 상태예요.' : ''));
+      } else {
+        target.troops = result.survivors;
+        src.troops = isCharge ? 0 : 1;
+        showMsg('공격에 실패했어요. 적 병력이 ' + result.survivors + '으로 줄었어요.' + (target.fort || target.terrain === 'mountain' ? ' (방어 보너스)' : '') + (isCharge ? ' 돌격 부대가 전멸해 영토가 무방비해요.' : ''));
+      }
+      actionsLeft -= 1;
+      renderMap();
+      updateStats();
+      checkGameOver();
+    });
+  }
+}
+
+eliteBtn.addEventListener('click', () => {
+  if (gameOver) return;
+  if (actionsLeft <= 0) { showMsg('이번 턴 행동을 모두 사용했어요.'); return; }
+  if (playerGold < ELITE_COST) { showMsg('골드가 부족해요 (5G 필요).'); return; }
+  selected = null;
+  chargeMode = false; updateChargeBtn();
+  abilityMode = abilityMode === 'elite' ? null : 'elite';
+  renderMap();
+  showMsg(abilityMode ? '정예를 배치할 내 영토를 선택하세요.' : '선택을 취소했어요.');
+});
+
+airstrikeBtn.addEventListener('click', () => {
+  if (gameOver) return;
+  if (actionsLeft <= 0) { showMsg('이번 턴 행동을 모두 사용했어요.'); return; }
+  if (playerGold < AIRSTRIKE_COST) { showMsg('골드가 부족해요 (8G 필요).'); return; }
+  selected = null;
+  chargeMode = false; updateChargeBtn();
+  abilityMode = abilityMode === 'airstrike' ? null : 'airstrike';
+  renderMap();
+  showMsg(abilityMode ? '공습할 적 영토를 선택하세요.' : '선택을 취소했어요.');
+});
+
+fortBtn.addEventListener('click', () => {
+  if (gameOver) return;
+  if (actionsLeft <= 0) { showMsg('이번 턴 행동을 모두 사용했어요.'); return; }
+  if (playerGold < FORT_COST) { showMsg('골드가 부족해요 (6G 필요).'); return; }
+  selected = null;
+  chargeMode = false; updateChargeBtn();
+  abilityMode = abilityMode === 'fort' ? null : 'fort';
+  renderMap();
+  showMsg(abilityMode ? '요새를 지을 내 영토를 선택하세요.' : '선택을 취소했어요.');
+});
+
+chargeBtn.addEventListener('click', () => {
+  if (gameOver) return;
+  if (actionsLeft <= 0) { showMsg('이번 턴 행동을 모두 사용했어요.'); return; }
+  abilityMode = null;
+  selected = null;
+  chargeMode = !chargeMode;
+  updateChargeBtn();
+  renderMap();
+  showMsg(chargeMode ? '돌격 모드 켜짐! 공격할 내 영토를 선택하세요.' : '돌격 모드를 껐어요.');
+});
+
+function aiTurn() {
+  const enemyTilesList = tiles
+    .map((t, i) => ({ tile: t, idx: i }))
+    .filter(o => o.tile.owner === 'enemy' && o.tile.troops >= 3);
+
+  let aiActions = ACTIONS_PER_TURN;
+
+  if (enemyGold >= FORT_COST && aiActions > 0 && Math.random() < 0.3) {
+    const border = enemyTilesList
+      .filter(o => adjacents(o.idx).some(i => tiles[i].owner === 'player') && !o.tile.fort)
+      .sort((a, b) => b.tile.troops - a.tile.troops)[0];
+    if (border) {
+      border.tile.fort = true;
+      enemyGold -= FORT_COST;
+      aiActions -= 1;
+    }
+  }
+
+  if (enemyGold >= ELITE_COST && aiActions > 0 && Math.random() < 0.5) {
+    const weakest = tiles
+      .map((t, i) => ({ tile: t, idx: i }))
+      .filter(o => o.tile.owner === 'enemy')
+      .sort((a, b) => a.tile.troops - b.tile.troops)[0];
+    if (weakest) {
+      weakest.tile.troops = Math.min(MAX_TROOPS, weakest.tile.troops + ELITE_GAIN);
+      enemyGold -= ELITE_COST;
+      aiActions -= 1;
+    }
+  }
+
+  for (const o of enemyTilesList) {
+    if (aiActions <= 0) break;
+    const adj = adjacents(o.idx).filter(i => tiles[i].owner !== 'enemy');
+    if (adj.length === 0) continue;
+    adj.sort((a, b) => tiles[a].troops - tiles[b].troops);
+    const targetIdx = adj[0];
+    const target = tiles[targetIdx];
+    const attackTroops = o.tile.troops - 1;
+    if (attackTroops < 1) continue;
+    const defEffective = target.troops * defMultiplier(target);
+    if (attackTroops <= defEffective * 0.8) continue;
+
+    const result = battle(o.tile, attackTroops, target);
+    if (result.attackerWins) {
+      target.owner = 'enemy';
+      target.troops = result.survivors;
+      target.fort = false;
+      target.veteranWins = Math.min(VETERAN_WINS_NEEDED, o.tile.veteranWins + 1);
+      o.tile.veteranWins = Math.min(VETERAN_WINS_NEEDED, o.tile.veteranWins + 1);
+    } else {
+      target.troops = result.survivors;
+    }
+    o.tile.troops = 1;
+    aiActions -= 1;
+  }
+}
+
+function randomEvents() {
+  if (Math.random() < 0.18) {
+    const playerOwned = tiles.map((t, i) => i).filter(i => tiles[i].owner === 'player');
+    if (playerOwned.length > 0) {
+      const idx = playerOwned[Math.floor(Math.random() * playerOwned.length)];
+      const roll = Math.random();
+      if (roll < 0.4) {
+        tiles[idx].troops = Math.min(MAX_TROOPS, tiles[idx].troops + 3);
+        showMsg('보급대가 도착해 병력이 늘었어요.');
+      } else if (roll < 0.7) {
+        tiles[idx].troops = Math.max(1, tiles[idx].troops - 2);
+        showMsg('내부 반란으로 병력을 일부 잃었어요.');
+      } else {
+        playerGold += 5;
+        showMsg('금맥을 발견해 골드 5를 얻었어요.');
+      }
+    }
+  }
+}
+
+function production() {
+  tiles.forEach(tile => {
+    if (tile.owner === 'neutral') return;
+    const troopGain = tile.capital ? 2 : 1;
+    tile.troops = Math.min(MAX_TROOPS, tile.troops + troopGain);
+    let goldGain = 1;
+    if (tile.terrain === 'resource') goldGain += 2;
+    if (tile.capital) goldGain += 2;
+    if (tile.owner === 'player') playerGold += goldGain;
+    else enemyGold += goldGain;
+  });
+}
+
+function checkGameOver() {
+  const playerCount = tiles.filter(t => t.owner === 'player').length;
+  const enemyCount = tiles.filter(t => t.owner === 'enemy').length;
+  if (playerCount === 0) {
+    gameOver = true;
+    showMsg('패배했어요. 모든 영토를 잃었어요. 턴 ' + turn);
+    endTurnBtn.setAttribute('disabled', 'true');
+    return true;
+  }
+  if (enemyCount === 0) {
+    gameOver = true;
+    showMsg('승리했어요! 적을 완전히 몰아냈어요. 턴 ' + turn);
+    endTurnBtn.setAttribute('disabled', 'true');
+    return true;
+  }
+  return false;
+}
+
+endTurnBtn.addEventListener('click', () => {
+  if (gameOver) return;
+  selected = null;
+  abilityMode = null;
+  chargeMode = false; updateChargeBtn();
+  aiTurn();
+  production();
+  randomEvents();
+  turn += 1;
+  actionsLeft = ACTIONS_PER_TURN;
+  renderMap();
+  updateStats();
+  if (!checkGameOver()) {
+    showMsg('새 턴이 시작됐어요. 영토를 선택해 행동하세요.');
+  }
+});
+
+document.getElementById('reset-btn').addEventListener('click', () => {
+  initTiles();
+  selected = null;
+  abilityMode = null;
+  chargeMode = false; updateChargeBtn();
+  actionsLeft = ACTIONS_PER_TURN;
+  turn = 1;
+  playerGold = 3; enemyGold = 3;
+  gameOver = false;
+  endTurnBtn.removeAttribute('disabled');
+  renderMap();
+  updateStats();
+  showMsg('내 영토(초록)를 눌러 선택한 뒤, 인접한 영토를 눌러 공격하거나 지원군을 보내세요.');
+});
+
+initTiles();
+renderMap();
+updateStats();
+</script>
+</body>
+</html>
